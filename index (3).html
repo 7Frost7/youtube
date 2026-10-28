@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="color-scheme" content="dark light">
+  <title>YouTube Floating Player</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #0b1020;
+      --panel: #141b2e;
+      --panel-2: #1c2640;
+      --text: #f4f6fb;
+      --muted: #aab5cc;
+      --accent: #7c9cff;
+      --accent-hover: #9bb2ff;
+      --border: #2b3754;
+      --danger: #ffb4b4;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at top, #192747 0%, var(--bg) 55%);
+      color: var(--text);
+      font: 16px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      padding: 32px 16px 48px;
+    }
+    main { width: min(940px, 100%); margin: 0 auto; }
+    header { text-align: center; margin: 12px 0 28px; }
+    .brand {
+      display: inline-flex; align-items: center; gap: 10px;
+      font-weight: 800; font-size: clamp(1.8rem, 5vw, 2.7rem); letter-spacing: -.04em;
+    }
+    .play-mark {
+      display: inline-grid; place-items: center; width: 42px; height: 30px;
+      border-radius: 9px; background: #ff0033; color: white; font-size: 17px;
+      letter-spacing: 0; box-shadow: 0 5px 20px #ff003333;
+    }
+    header p { margin: 8px 0 0; color: var(--muted); }
+    .panel {
+      background: color-mix(in srgb, var(--panel) 94%, transparent);
+      border: 1px solid var(--border); border-radius: 20px; padding: clamp(18px, 4vw, 30px);
+      box-shadow: 0 20px 65px #0004;
+    }
+    label { display: block; font-weight: 700; margin-bottom: 9px; }
+    .input-row { display: flex; gap: 10px; }
+    input {
+      flex: 1; min-width: 0; padding: 13px 15px; border: 1px solid #3a4867;
+      background: #080e1c; color: var(--text); border-radius: 11px; font: inherit; outline: none;
+    }
+    input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px #7c9cff30; }
+    button, .button-link {
+      display: inline-flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 16px; border: 0; border-radius: 11px; background: var(--accent);
+      color: #081027; font: inherit; font-weight: 750; cursor: pointer; text-decoration: none;
+      transition: background .15s, transform .15s;
+    }
+    button:hover, .button-link:hover { background: var(--accent-hover); }
+    button:active, .button-link:active { transform: translateY(1px); }
+    button.secondary, .button-link.secondary { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+    button.secondary:hover, .button-link.secondary:hover { background: #263453; }
+    .hint { margin: 10px 0 0; font-size: .9rem; color: var(--muted); }
+    #status { min-height: 1.5em; margin-top: 12px; color: var(--muted); font-size: .94rem; }
+    #status.error { color: var(--danger); }
+    #player-section { margin-top: 24px; display: none; }
+    .player-top { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+    h2 { font-size: 1.15rem; margin: 0; overflow-wrap: anywhere; }
+    .player {
+      position: relative; width: 100%; aspect-ratio: 16 / 9; overflow: hidden;
+      border-radius: 14px; background: #000; border: 1px solid var(--border);
+    }
+    iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; }
+    .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 14px; }
+    .notes { margin-top: 22px; color: var(--muted); font-size: .92rem; }
+    details { margin-top: 18px; border-top: 1px solid var(--border); padding-top: 16px; }
+    summary { cursor: pointer; color: var(--text); font-weight: 700; }
+    footer { text-align: center; color: var(--muted); font-size: .82rem; margin-top: 22px; }
+    @media (max-width: 600px) {
+      body { padding: 18px 12px 32px; }
+      .input-row { flex-direction: column; }
+      .input-row button { width: 100%; }
+      .player-top { align-items: flex-start; flex-direction: column; }
+      .actions > * { flex: 1 1 100%; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <div class="brand"><span class="play-mark" aria-hidden="true">▶</span><span>YouTube Floating Player</span></div>
+      <p>Paste a YouTube link to watch it here.</p>
+    </header>
+
+    <section class="panel" aria-labelledby="input-label">
+      <form id="video-form">
+        <label id="input-label" for="youtube-url">YouTube video URL</label>
+        <div class="input-row">
+          <input id="youtube-url" name="youtube-url" type="url" placeholder="https://www.youtube.com/watch?v=…" autocomplete="url" spellcheck="false" required>
+          <button type="submit">▶ Watch</button>
+        </div>
+      </form>
+      <p class="hint">Supports youtube.com, youtu.be, Shorts, live videos, and embed links.</p>
+      <div id="status" role="status" aria-live="polite"></div>
+
+      <section id="player-section" aria-label="Video player">
+        <div class="player-top">
+          <h2 id="video-title">Now playing</h2>
+          <button class="secondary" id="change-video" type="button">Change video</button>
+        </div>
+        <div class="player">
+          <iframe
+            id="video-frame"
+            title="YouTube video player"
+            src=""
+            referrerpolicy="strict-origin-when-cross-origin"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+            allowfullscreen>
+          </iframe>
+        </div>
+        <div class="actions">
+          <a class="button-link" id="open-youtube" href="https://www.youtube.com/" target="_blank" rel="noopener noreferrer">Open on YouTube ↗</a>
+          <button class="secondary" id="open-player-tab" type="button">Open player in new tab ↗</button>
+        </div>
+      </section>
+
+      <div class="notes">
+        <strong>For GitHub Pages:</strong> upload this file as <code>index.html</code> in the top level of your repository, then enable Pages in the repository’s <strong>Settings → Pages</strong>.
+        <details>
+          <summary>Still getting Error 153?</summary>
+          <p>Use the published <code>https://…github.io/…</code> page, not the local file preview. This page sets a referrer policy so the browser can send the site origin to YouTube. If Error 153 persists, check that your browser or an extension is not stripping referrers. Some videos also have embedding disabled or other playback restrictions; use “Open on YouTube” for those.</p>
+        </details>
+      </div>
+    </section>
+    <footer>This page embeds videos using YouTube’s official embedded player.</footer>
+  </main>
+
+  <script>
+    (() => {
+      const form = document.getElementById('video-form');
+      const input = document.getElementById('youtube-url');
+      const status = document.getElementById('status');
+      const section = document.getElementById('player-section');
+      const frame = document.getElementById('video-frame');
+      const title = document.getElementById('video-title');
+      const openYoutube = document.getElementById('open-youtube');
+      const openPlayerTab = document.getElementById('open-player-tab');
+      const changeVideo = document.getElementById('change-video');
+      let currentId = '';
+
+      function extractVideoId(raw) {
+        let url;
+        try { url = new URL(raw.trim()); }
+        catch { throw new Error('Enter a complete YouTube URL, including https://.'); }
+
+        const host = url.hostname.toLowerCase().replace(/^www\./, '').replace(/^m\./, '');
+        let id = '';
+        if (host === 'youtu.be') {
+          id = url.pathname.split('/').filter(Boolean)[0] || '';
+        } else if (host === 'youtube.com' || host === 'music.youtube.com' || host === 'youtube-nocookie.com') {
+          if (url.pathname === '/watch') id = url.searchParams.get('v') || '';
+          else {
+            const match = url.pathname.match(/^\/(?:embed|shorts|live|v)\/([^/?]+)/);
+            if (match) id = match[1];
+          }
+        } else {
+          throw new Error('That does not look like a supported YouTube URL.');
+        }
+
+        // YouTube video IDs use 11 URL-safe characters.
+        if (!/^[A-Za-z0-9_-]{11}$/.test(id)) {
+          throw new Error('Could not find a valid video ID in that URL. Copy the video link from YouTube and try again.');
+        }
+        return id;
+      }
+
+      function setStatus(message, isError = false) {
+        status.textContent = message;
+        status.classList.toggle('error', isError);
+      }
+
+      function loadVideo(id) {
+        currentId = id;
+        const embedUrl = new URL('https://www.youtube-nocookie.com/embed/' + encodeURIComponent(id));
+        embedUrl.searchParams.set('rel', '0');
+        embedUrl.searchParams.set('playsinline', '1');
+        // Keep an explicit origin for YouTube's player context when this page is served over HTTP(S).
+        if (location.protocol === 'https:' || location.protocol === 'http:') {
+          embedUrl.searchParams.set('origin', location.origin);
+        }
+        frame.src = embedUrl.toString();
+        openYoutube.href = 'https://www.youtube.com/watch?v=' + encodeURIComponent(id);
+        title.textContent = 'Video: ' + id;
+        section.style.display = 'block';
+        setStatus('Video loaded. Press Play in the player if it does not start automatically.');
+        section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+
+      form.addEventListener('submit', (event) => {
+        event.preventDefault();
+        try {
+          const id = extractVideoId(input.value);
+          setStatus('');
+          loadVideo(id);
+        } catch (error) {
+          section.style.display = 'none';
+          frame.src = '';
+          setStatus(error.message || 'Could not load that video.', true);
+        }
+      });
+
+      changeVideo.addEventListener('click', () => {
+        frame.src = '';
+        section.style.display = 'none';
+        input.focus();
+        input.select();
+        setStatus('Paste a different YouTube URL above.');
+      });
+
+      openPlayerTab.addEventListener('click', () => {
+        if (!currentId) return;
+        const params = new URLSearchParams({ v: currentId });
+        const playerUrl = new URL(location.href);
+        playerUrl.search = params.toString();
+        playerUrl.hash = '';
+        window.open(playerUrl.toString(), '_blank', 'noopener,noreferrer');
+      });
+
+      // Support a video link passed in as ?v=VIDEO_ID or ?url=YOUTUBE_URL.
+      const params = new URLSearchParams(location.search);
+      const initial = params.get('url') || params.get('v');
+      if (initial) {
+        try {
+          const id = params.has('url') ? extractVideoId(initial) : extractVideoId('https://www.youtube.com/watch?v=' + initial);
+          input.value = 'https://www.youtube.com/watch?v=' + id;
+          loadVideo(id);
+        } catch (error) {
+          setStatus(error.message || 'Could not load the video in the URL.', true);
+        }
+      }
+    })();
+  </script>
+</body>
+</html>
